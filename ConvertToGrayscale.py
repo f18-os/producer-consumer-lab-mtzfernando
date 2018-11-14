@@ -3,7 +3,7 @@
 import cv2
 
 # globals
-outputDir    = 'frames'
+outputDir = 'frames'
 
 # initialize frame count
 count = 0
@@ -19,7 +19,7 @@ while inputFrame is not None:
 
     # convert the image to grayscale
     grayscaleFrame = cv2.cvtColor(inputFrame, cv2.COLOR_BGR2GRAY)
-    
+
     # generate output file name
     outFileName = "{}/grayscale_{:04d}.jpg".format(outputDir, count)
 
@@ -33,6 +33,3 @@ while inputFrame is not None:
 
     # load the next frame
     inputFrame = cv2.imread(inFileName, cv2.IMREAD_COLOR)
-
-    
-    
