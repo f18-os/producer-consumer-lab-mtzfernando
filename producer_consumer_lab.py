@@ -24,8 +24,8 @@ class ExtractFrames(Thread):
             extract_to_convert_queue.put(image)
 
             success, image = video_capture.read()
-            print('Reading frame {} {}'.format(count, success))
             count += 1
+            print('Reading frame {} {}'.format(count, success))
 
         print("Frame extraction complete")
         done_extracting = True
@@ -38,12 +38,12 @@ class ConvertToGrayScale(Thread):
         # initialize frame count
         count = 0
 
-        while not done_extracting:
+        while not done_extracting or not extract_to_convert_queue.empty():
             image = extract_to_convert_queue.get()
 
             print("Converting frame {}".format(count))
 
-            # convert the image to grayscale
+            # convert the image to gray scale
             gray_scale_frame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             # get a jpg encoded frame
@@ -67,7 +67,7 @@ class DisplayFrames(Thread):
         count = 0
 
         # go through each frame in the buffer until the buffer is empty
-        while not done_converting:
+        while not done_converting or not convert_to_display_queue.empty():
             # get the next frame
             frameAsText = convert_to_display_queue.get()
 
