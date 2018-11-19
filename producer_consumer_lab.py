@@ -9,7 +9,7 @@ extract_to_convert_queue = queue.Queue(10)                                      
 convert_to_display_queue = queue.Queue(10)                                          # The queue for convert producer to display consumer
 done_extracting = False                                                             # Flag to signal the extraction is done
 done_converting = False                                                             # Flag to signal the conversion is done
-frame_delay = 47                                                                    # The delay for the frames
+frame_delay = 42                                                                    # The delay for the frames
 start_time = time.time()                                                            # Get the current time
 
 
@@ -67,7 +67,7 @@ class DisplayFrames(Thread):
 
             print("Displaying frame {}".format(count))
 
-            # display the image in a window called "video" and wait 47ms before displaying the next frame
+            # display the image in a window called "video" and wait 42ms before displaying the next frame
             cv2.imshow("Video", img)
 
             # Compute the amount of time that has elapsed while the frame was processed
@@ -76,7 +76,7 @@ class DisplayFrames(Thread):
             # Determine the amount of time to wait, also make sure we don't go into negative time
             time_to_wait = max(1, frame_delay - elapsed_time)
 
-            if cv2.waitKey(time_to_wait) and 0xFF == ord("q"):                      # Wait for 47ms and check if the user wants to quit
+            if cv2.waitKey(time_to_wait) and 0xFF == ord("q"):                      # Wait for 42ms and check if the user wants to quit
                 break
             count += 1
 
