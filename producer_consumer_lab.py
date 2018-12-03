@@ -2,15 +2,16 @@
 
 import base64
 import time
-from threading import Thread, Condition
+from threading import Thread, Semaphore
 import cv2
 import numpy as np
 
 extract_to_convert_queue = []                                                       # The queue for extract producer to convert consumer
 convert_to_display_queue = []                                                       # The queue for convert producer to display consumer
-MAX_NUM = 10                                                                        # Max number of items allowed in the queue
-extract_convert_lock = Condition()                                                  # Extract to convert lock
-convert_display_lock = Condition()                                                  # Convert to display lock
+extract_to_convert_full = Semaphore(10)                                             # Extract to convert full semaphore
+extract_to_convert_empty = Semaphore(0)                                             # Extract to convert empty semaphore
+convert_to_display_full = Semaphore(10)                                             # Convert to display full semaphore
+convert_to_display_empty = Semaphore(0)                                             # Convert to display full semaphore
 done_extracting = False                                                             # Flag to signal the extraction is done
 done_converting = False                                                             # Flag to signal the conversion is done
 frame_delay = 42                                                                    # The delay for the frames
@@ -26,13 +27,12 @@ class ExtractFrames(Thread):
         success, image = video_capture.read()                                       # Read one frame
 
         while success:                                                              # Go through each frame in the buffer
-            extract_convert_lock.acquire()                                          # Acquire the lock
-            if len(extract_to_convert_queue) == MAX_NUM:                            # Check if the queue is full
-                extract_convert_lock.wait()                                         # Wait if the lock is full
-            print("Reading frame {} {} ".format(count, success))
+            extract_to_convert_full.acquire()                                       # Acquire the extract to convert full semaphore
+
+            print("Reading frame {}".format(count))
             extract_to_convert_queue.append(image)                                  # Add the frame to the buffer
-            extract_convert_lock.notify()                                           # Wake up the thread waiting for the lock
-            extract_convert_lock.release()                                          # Release the lock
+
+            extract_to_convert_empty.release()                                      # Release the extract to convert empty semaphore
             success, image = video_capture.read()                                   # Read one frame
             count += 1
 
@@ -46,25 +46,19 @@ class ConvertToGrayScale(Thread):
         global extract_to_convert_queue, done_converting
 
         while not done_extracting or extract_to_convert_queue:                      # Go through each frame in the buffer
-            extract_convert_lock.acquire()                                          # Acquire the lock
-            if not extract_to_convert_queue:                                        # If queue is empty wait
-                extract_convert_lock.wait()
-            image = extract_to_convert_queue.pop(0)                                  # Get the frame from the queue
+            extract_to_convert_empty.acquire()                                      # Acquire the extract to convert empty semaphore
+            image = extract_to_convert_queue.pop(0)                                 # Get the frame from the queue
 
             print("Converting frame {}".format(count))
 
             gray_scale_frame = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)              # Convert the image to gray scale
             success, jpg_image = cv2.imencode('.jpg', gray_scale_frame)             # Get a jpg encoded frame
             jpg_as_text = base64.b64encode(jpg_image)                               # Encode the frame as base 64 to make debugging easier
-            extract_convert_lock.notify()                                           # Wake up the thread waiting for the lock
-            extract_convert_lock.release()                                          # Release the lock
+            extract_to_convert_full.release()                                       # Release the extract to convert full semaphore
 
-            convert_display_lock.acquire()                                          # Acquire the lock
-            if len(convert_to_display_queue) == MAX_NUM:                            # If queue is full wait
-                convert_display_lock.wait()
+            convert_to_display_full.acquire()                                       # Acquire the convert to display full semaphore
             convert_to_display_queue.append(jpg_as_text)                            # Add the frame to the buffer
-            convert_display_lock.notify()                                           # Wake up the thread waiting for the lock
-            convert_display_lock.release()                                          # Release the lock
+            convert_to_display_empty.release()                                      # Release the convert to display empty semaphore
             count += 1
 
         print("Frame conversion complete")
@@ -77,9 +71,7 @@ class DisplayFrames(Thread):
         count = 0                                                                   # Initialize frame count
 
         while not done_converting or convert_to_display_queue:                      # Go through each frame in the buffer
-            convert_display_lock.acquire()                                          # Acquire the lock
-            if not convert_to_display_queue:                                        # If queue is empty wait
-                convert_display_lock.wait()
+            convert_to_display_empty.acquire()                                      # Acquire the convert to display empty semaphore
             frameAsText = convert_to_display_queue.pop(0)                           # Get the next frame
             jpgRawImage = base64.b64decode(frameAsText)                             # Decode the frame
             jpgImage = np.asarray(bytearray(jpgRawImage), dtype=np.uint8)           # Convert the raw frame to a numpy array
@@ -100,8 +92,7 @@ class DisplayFrames(Thread):
                 break
             start_time = time.time()                                                # Get the current time
             count += 1
-            convert_display_lock.notify()                                           # Wake up the thread waiting for the lock
-            convert_display_lock.release()                                          # Release the lock
+            convert_to_display_full.release()                                       # Release the convert to display full semaphore
         print("Finished displaying all frames")
         cv2.destroyAllWindows()                                                     # Cleanup the windows
 
